@@ -1,8 +1,8 @@
 const axios = require("axios");
 const rateLimit = require("axios-rate-limit");
-const chalk = require("chalk");
 
 class ThunderstoreApi {
+  #index = null;
   #thunderstore;
   #rateLimitErrorCode = 429;
   #oneminute = 60000;
@@ -18,11 +18,7 @@ class ThunderstoreApi {
   }
 
   async fetchModData(mod) {
-    const thunderstore = rateLimit(axios.create(), {
-      maxRequests: 1,
-      perMilliseconds: 1000,
-    });
-    const response = await thunderstore.get(
+    const response = await this.#thunderstore.get(
       `${this.#modPackage}/${mod.namespace}/${mod.name}/`,
       {
         headers: {
@@ -31,6 +27,19 @@ class ThunderstoreApi {
       },
     );
     return response.data;
+  }
+
+  parseModString(modString) {
+    const parts = modString.split("-");
+    const author = parts[0];
+    const name = parts[1].split("-")[0];
+    const version = parts[2];
+    const mod = {
+      author: author,
+      name: name,
+      version: version,
+    };
+    return mod;
   }
 
   // Initially written for experimental API, can be seriously simplified
@@ -42,20 +51,10 @@ class ThunderstoreApi {
         },
       })
       .then((res) => {
-        console.log(chalk.green(`Index fetched, ${res.data.length} entries`));
-        let arr = res.data
-          .split("\n")
-          .map((str) => {
-            try {
-              return JSON.parse(str);
-            } catch (error) {
-              console.error(`Failed to parse JSON: ${str}`);
-              return null;
-            }
-          })
-          .filter((item) => item !== null);
-        console.log(arr);
-        return arr;
+        console.log(`Index fetched, ${res.data.length} entries`);
+        // console.log(JSON.stringify(res.data, null, 2)); // Debugging info, uncomment to view res.data as JSON (or any other format you like);
+        this.#index = res.data;
+        return;
       })
       .catch((error) => {
         console.error(error);
@@ -63,25 +62,44 @@ class ThunderstoreApi {
     return response;
   }
   // -> index of packages
+  async checkforUpdate(mod) {
+    if (this.#index === null) {
+      // Guard clause to ensure that index is fetched
+      await this.fetchIndex();
+    }
+
+    // TODO: implement mapKey() in array filtering (if needed, might just skip with indexEntry.k === mod.k)
+
+    // function mapKey(key) {
+    //   const keyMap = {
+    //     name: "name",
+    //     owner: "author",
+    //   };
+    // }
+
+    // TODO: search index for mod, mod has {name, author, version}, index has {name, owner, versions[version_number]}
+    const modIndex = this.#index.find(
+      (indexEntry) =>
+        indexEntry.name === mod.name && indexEntry.owner === mod.author,
+      // TODO: add logic to check if package is up to date
+    );
+  }
 
   async fetchDependencies(deps) {
     const delay = (ms) => new Promise((res) => setTimeout(res, ms));
     if (deps.length === 0) {
-      console.log(chalk.red("deps is empty"));
+      console.log("Error: No Dependencies");
       return;
     }
-    for (const dep of deps) {
+    for (const modString of deps) {
       try {
-        const mod = await this.fetchModData(dep);
-        if (mod.latest.version_number === dep.version_number) {
-          console.log(
-            chalk.cyan(`${mod.name}: version matches: ${dep.version_number}`),
-          );
+        const mod = this.parseModString(modString);
+        const data = await this.fetchModData(mod);
+        if (data.latest.version_number === mod.version_number) {
+          console.log(`${mod.name}: version matches: ${mod.version_number}`);
         } else {
           console.log(
-            chalk.yellow(
-              `${mod.name}: new version available: ${dep.version_number} -> ${mod.latest.version_number}`,
-            ),
+            `${mod.name}: new version available: ${mod.version_number} -> ${data.latest.version_number}`,
           );
         }
       } catch (error) {
@@ -89,7 +107,7 @@ class ThunderstoreApi {
           error.response &&
           error.response.status === this.#rateLimitErrorCode
         ) {
-          console.log(chalk.red("Rate limit exceeded, waiting for 60 seconds"));
+          console.log("Rate limit exceeded, waiting for 60 seconds");
           await delay(this.#oneminute); // Wait for 60 seconds
         } else {
           console.error(error);
@@ -98,3 +116,4 @@ class ThunderstoreApi {
     }
   }
 }
+exports.ThunderstoreApi = ThunderstoreApi;

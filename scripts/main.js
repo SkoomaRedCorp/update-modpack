@@ -1,19 +1,9 @@
 const core = require("@actions/core");
 const fs = require("fs");
 const path = require("path");
+const { ThunderstoreApi } = require("./thunderstoreApi.js");
 
-function parseModString(modString) {
-  const parts = modString.split("-");
-  const author = parts[0];
-  const name = parts[1].split("-")[0];
-  const version = parts[2];
-  const mod = {
-    author: author,
-    name: name,
-    version: version,
-  };
-  return mod;
-}
+const thunderstore = new ThunderstoreApi();
 
 function getModArrayFromManifest(manifest) {
   const modArray = manifest.dependencies;
@@ -28,12 +18,19 @@ function getModArrayFromManifest(manifest) {
   return output;
 }
 
-try {
-  const modpackpath = core.getInput("modpack");
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(modpackpath, "/manifest.json"), "utf8"),
-  );
-  const dependencies = getModArrayFromManifest(manifest);
-} catch (error) {
-  console.log(error);
+async function main() {
+  try {
+    // const modpackpath = core.getInput("modpack");
+    // const manifest = JSON.parse(
+    // fs.readFileSync(path.join(modpackpath, "/manifest.json"), "utf8"),
+    // );
+    // const dependencies = getModArrayFromManifest(manifest);
+    // thunderstore.fetchDependencies(dependencies);
+    const index = await thunderstore.fetchIndex();
+    // console.log(JSON.stringify(index, null, 2)); // Debug Information uncomment to see index structure
+  } catch (error) {
+    console.log(error);
+  }
 }
+
+main();
