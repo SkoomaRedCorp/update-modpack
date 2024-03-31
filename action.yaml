@@ -1,0 +1,14 @@
+name: Update Valheim Modpack
+description: Updates the Valheim Modpack
+author: MisterMycelium
+branding:
+  icon: download-cloud
+  color: blue
+inputs:
+  modpack:
+    description: "Path to the Valheim Modpack"
+    required: false
+    default: "modpack"
+runs:
+  using: "node20"
+  main: "/scripts/main.js"
